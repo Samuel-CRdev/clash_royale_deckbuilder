@@ -1,32 +1,26 @@
 import requests
+import os
 
-# 👉 Substitua isso pela sua própria chave da Supercell
-API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjIwNGRhNTljLWM2MGQtNDRjNy1iYWM5LTMxMDQ1Y2ZjYWM5OCIsImlhdCI6MTc2MTg3MTIwMSwic3ViIjoiZGV2ZWxvcGVyLzA0NGQ5ZTIzLTljMzYtMjJlYi1hMzkwLTEzOTdhZjc4YTVjYSIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxOTAuMTE1LjY2Ljk5Il0sInR5cGUiOiJjbGllbnQifV19.dxxWxOgs-fWrAlFKNFLbQgBxiYTywLCKMqmvSQ1iWS0bmZisRxjpfoP119ujuoqHacvnpOcZj0thSBdJnA09Ow"
+# sua chave pessoal da Supercell
+API_KEY = os.getenv("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjlhMjdlZTIzLTdkYzMtNDIxZC1hZTJhLTMzZWQ2OGZlMDNjMyIsImlhdCI6MTc2MjYyMjY1Mywic3ViIjoiZGV2ZWxvcGVyLzA0NGQ5ZTIzLTljMzYtMjJlYi1hMzkwLTEzOTdhZjc4YTVjYSIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMDAuMjAuOTIuMTAxIiwiNDQuMjI1LjE4MS43MiIsIjQ0LjIyNy4yMTcuMTQ0Il0sInR5cGUiOiJjbGllbnQifV19.MbxFOYVLgQnsNXTfFtswqBu2SDyVzt5ZBLbjDSAMwVndTkYsTICdPQgeThtzgQo5fSeZaQCBki_kPSGAa0QILQ") or "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjlhMjdlZTIzLTdkYzMtNDIxZC1hZTJhLTMzZWQ2OGZlMDNjMyIsImlhdCI6MTc2MjYyMjY1Mywic3ViIjoiZGV2ZWxvcGVyLzA0NGQ5ZTIzLTljMzYtMjJlYi1hMzkwLTEzOTdhZjc4YTVjYSIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxMDAuMjAuOTIuMTAxIiwiNDQuMjI1LjE4MS43MiIsIjQ0LjIyNy4yMTcuMTQ0Il0sInR5cGUiOiJjbGllbnQifV19.MbxFOYVLgQnsNXTfFtswqBu2SDyVzt5ZBLbjDSAMwVndTkYsTICdPQgeThtzgQo5fSeZaQCBki_kPSGAa0QILQ"
 
-# Tag do jogador (você encontra no Clash Royale — ex: #2PP ou #8YLUUQJ)
-PLAYER_TAG = "2GJRJRQLG"
+# endpoint de teste — lista todas as cartas do jogo
+url = "https://api.clashroyale.com/v1/cards"
 
-# Construindo a URL (note o %23 no lugar do #)
-url = f"https://api.clashroyale.com/v1/players/%23{PLAYER_TAG}"
-
-# Cabeçalhos obrigatórios (para autorização e formato de resposta)
 headers = {
     "Accept": "application/json",
     "Authorization": f"Bearer {API_KEY}"
 }
 
-# Enviando a requisição
 response = requests.get(url, headers=headers)
 
-# Verificando o resultado
 if response.status_code == 200:
     data = response.json()
-    print("✅ Conexão bem-sucedida!")
-    print("Nome:", data["name"])
-    print("Nível:", data["expLevel"])
-    print("Troféus:", data["trophies"])
+    print(f"✅ Conexão bem-sucedida! Total de cartas: {len(data['items'])}")
+    print("Exemplo:")
+    for card in data["items"][:5]:
+        print(f" - {card['name']} (Elixir: {card.get('elixirCost', 'N/A')})")
 else:
-    print("❌ Erro ao conectar.")
+    print("❌ Erro ao conectar:")
     print("Status:", response.status_code)
     print(response.text)
-

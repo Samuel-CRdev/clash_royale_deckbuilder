@@ -46,11 +46,29 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     model_name = os.getenv("GEMINI_MODEL") or MODEL_DEFAULT
     model = genai.GenerativeModel(model_name)
 
-    # Schema mais permissivo (sem minItems/maxItems)
+    # Schema válido (Gemini exige que arrays tenham 'items')
     schema = {
         "type": "object",
         "properties": {
-            "decks": {"type": "array"}
+            "decks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cards": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "avg_elixir": {"type": "number"},
+                        "evolved_cards": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "reasons": {"type": "string"},
+                        "warnings": {"type": "string"}
+                    }
+                }
+            }
         }
     }
 
@@ -68,7 +86,7 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
 
-        # tenta extrair texto ou JSON
+        # extrai texto ou JSON da resposta
         text = ""
         if hasattr(resp, "text") and resp.text:
             text = resp.text
@@ -87,7 +105,7 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         raise RuntimeError(f"Gemini generation failed: {e}")
 
-    # garantir que existam exatamente 3 decks
+    # garantir que sempre existam exatamente 3 decks
     decks = data.get("decks", [])
     if len(decks) > 3:
         decks = decks[:3]
@@ -103,3 +121,4 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     data["decks"] = decks
 
     return data
+

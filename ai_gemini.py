@@ -13,28 +13,12 @@ You are a Clash Royale deck planner. INPUT is a JSON with:
 - meta: curated archetypes from the last ~4 months
 - request: natural language preferences (style, must-haves, target elixir)
 
-OUTPUT must be STRICT JSON with exactly 3 decks:
-{
-  "decks": [
-    {
-      "cards": ["Card1","Card2","Card3","Card4","Card5","Card6","Card7","Card8"],
-      "avg_elixir": 3.4,
-      "evolved_cards": ["CardA","CardB"],   // <= 2, subset of player.evolutions_owned and of 'cards'
-      "reasons": "concise explanation (fit to meta, player's levels, request)",
-      "warnings": "optional"
-    },
-    { ... },
-    { ... }
-  ]
-}
-
-Rules:
-- Use ONLY real Clash Royale card names present in INPUT.cards or INPUT.meta.
-- Prefer cards the player OWNS; if not owned, justify in 'warnings' and suggest nearest owned alternative in 'reasons'.
-- Exactly 3 decks; each deck must have exactly 8 unique cards.
-- Respect constraints.max_evolutions_per_deck (<=2) and only use evolutions from player.evolutions_owned.
-- Consider the request (e.g., target elixir, must-haves) and current meta.
-- No extra text outside the JSON.
+OUTPUT should SUGGEST 3 decks with reasoning, even if not strict JSON.
+Each deck includes:
+- 8 card names
+- average elixir
+- up to 2 evolved cards
+- short explanation and optional warning
 """
 
 def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -46,47 +30,24 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     model_name = os.getenv("GEMINI_MODEL") or MODEL_DEFAULT
     model = genai.GenerativeModel(model_name)
 
-    # Schema válido (Gemini exige que arrays tenham 'items')
-    schema = {
-        "type": "object",
-        "properties": {
-            "decks": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "cards": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "avg_elixir": {"type": "number"},
-                        "evolved_cards": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "reasons": {"type": "string"},
-                        "warnings": {"type": "string"}
-                    }
-                }
-            }
-        }
-    }
+    # prompt completo
+    full_prompt = (
+        INSTRUCTIONS
+        + "\n\nHere is the player and context data:\n"
+        + json.dumps(payload, ensure_ascii=False)
+    )
 
     try:
+        # chamada sem schema (modo livre)
         resp = model.generate_content(
-            contents=[
-                {"role": "user", "parts": [INSTRUCTIONS]},
-                {"role": "user", "parts": [json.dumps(payload, ensure_ascii=False)]}
-            ],
+            full_prompt,
             generation_config={
-                "temperature": 0.3,
-                "max_output_tokens": 1200,
-                "response_mime_type": "application/json",
-                "response_schema": schema
+                "temperature": 0.4,
+                "max_output_tokens": 1500
             }
         )
 
-        # extrai texto ou JSON da resposta
+        # extrai texto bruto
         text = ""
         if hasattr(resp, "text") and resp.text:
             text = resp.text
@@ -100,12 +61,33 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
         if not text.strip():
             raise RuntimeError("Empty or no-match response from Gemini")
 
-        data = json.loads(text)
+        # tenta converter o trecho JSON, se existir
+        try:
+            json_start = text.find("{")
+            json_end = text.rfind("}")
+            if json_start != -1 and json_end != -1:
+                snippet = text[json_start:json_end + 1]
+                data = json.loads(snippet)
+            else:
+                raise ValueError("No JSON detected")
+        except Exception:
+            # fallback em caso de resposta não-JSON
+            data = {
+                "decks": [
+                    {
+                        "cards": [],
+                        "avg_elixir": 0,
+                        "evolved_cards": [],
+                        "reasons": text.strip(),
+                        "warnings": ""
+                    }
+                ]
+            }
 
     except Exception as e:
         raise RuntimeError(f"Gemini generation failed: {e}")
 
-    # garantir que sempre existam exatamente 3 decks
+    # garante 3 decks no retorno
     decks = data.get("decks", [])
     if len(decks) > 3:
         decks = decks[:3]
@@ -121,4 +103,3 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     data["decks"] = decks
 
     return data
-

@@ -46,58 +46,49 @@ def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     model_name = os.getenv("GEMINI_MODEL") or MODEL_DEFAULT
     model = genai.GenerativeModel(model_name)
 
-    # Schema atualizado (sem minItems/maxItems) para compatibilidade com SDK novo
+    # Schema mais permissivo (sem minItems/maxItems)
     schema = {
         "type": "object",
         "properties": {
-            "decks": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "cards": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "avg_elixir": {"type": "number"},
-                        "evolved_cards": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
-                        "reasons": {"type": "string"},
-                        "warnings": {"type": "string"}
-                    },
-                    "required": ["cards"]
-                }
-            }
-        },
-        "required": ["decks"]
+            "decks": {"type": "array"}
+        }
     }
 
-    # chamada ao Gemini
-    resp = model.generate_content(
-        contents=[
-            {"role": "user", "parts": [INSTRUCTIONS]},
-            {"role": "user", "parts": [json.dumps(payload, ensure_ascii=False)]}
-        ],
-        generation_config={
-            "temperature": 0.2,
-            "max_output_tokens": 800,
-            "response_mime_type": "application/json",
-            "response_schema": schema
-        }
-    )
+    try:
+        resp = model.generate_content(
+            contents=[
+                {"role": "user", "parts": [INSTRUCTIONS]},
+                {"role": "user", "parts": [json.dumps(payload, ensure_ascii=False)]}
+            ],
+            generation_config={
+                "temperature": 0.3,
+                "max_output_tokens": 1200,
+                "response_mime_type": "application/json",
+                "response_schema": schema
+            }
+        )
 
-    if not resp or not resp.text:
-        raise RuntimeError("Empty response from Gemini")
+        # tenta extrair texto ou JSON
+        text = ""
+        if hasattr(resp, "text") and resp.text:
+            text = resp.text
+        elif hasattr(resp, "candidates") and resp.candidates:
+            for c in resp.candidates:
+                if c.content and hasattr(c.content, "parts"):
+                    for p in c.content.parts:
+                        if hasattr(p, "text"):
+                            text += p.text
 
-    data = json.loads(resp.text)
+        if not text.strip():
+            raise RuntimeError("Empty or no-match response from Gemini")
 
-    # Garantir que sempre existam exatamente 3 decks
-    if "decks" not in data:
-        raise RuntimeError("Malformed response: missing 'decks' field")
+        data = json.loads(text)
 
-    decks = data["decks"]
+    except Exception as e:
+        raise RuntimeError(f"Gemini generation failed: {e}")
+
+    # garantir que existam exatamente 3 decks
+    decks = data.get("decks", [])
     if len(decks) > 3:
         decks = decks[:3]
     elif len(decks) < 3:

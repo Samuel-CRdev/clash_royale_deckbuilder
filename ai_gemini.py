@@ -37,7 +37,7 @@ Rules:
 - No extra text outside the JSON.
 """
 
-def suggest_three_decks(payload: Dict[str,Any]) -> Dict[str,Any]:
+def suggest_three_decks(payload: Dict[str, Any]) -> Dict[str, Any]:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("Missing GEMINI_API_KEY")
@@ -46,40 +46,39 @@ def suggest_three_decks(payload: Dict[str,Any]) -> Dict[str,Any]:
     model_name = os.getenv("GEMINI_MODEL") or MODEL_DEFAULT
     model = genai.GenerativeModel(model_name)
 
-    # Structured output (schema) para garantir 3 decks com 8 cartas e até 2 evoluções
+    # Schema atualizado (sem minItems/maxItems) para compatibilidade com SDK novo
     schema = {
-      "type": "object",
-      "properties": {
-        "decks": {
-          "type": "array",
-          "minItems": 3, "maxItems": 3,
-          "items": {
-            "type": "object",
-            "properties": {
-              "cards": {
+        "type": "object",
+        "properties": {
+            "decks": {
                 "type": "array",
-                "minItems": 8, "maxItems": 8,
-                "items": { "type": "string" }
-              },
-              "avg_elixir": { "type": "number" },
-              "evolved_cards": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "reasons": { "type": "string" },
-              "warnings": { "type": "string" }
-            },
-            "required": ["cards"]
-          }
-        }
-      },
-      "required": ["decks"]
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cards": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "avg_elixir": {"type": "number"},
+                        "evolved_cards": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "reasons": {"type": "string"},
+                        "warnings": {"type": "string"}
+                    },
+                    "required": ["cards"]
+                }
+            }
+        },
+        "required": ["decks"]
     }
 
+    # chamada ao Gemini
     resp = model.generate_content(
         contents=[
-            {"role":"user","parts":[INSTRUCTIONS]},
-            {"role":"user","parts":[json.dumps(payload, ensure_ascii=False)]}
+            {"role": "user", "parts": [INSTRUCTIONS]},
+            {"role": "user", "parts": [json.dumps(payload, ensure_ascii=False)]}
         ],
         generation_config={
             "temperature": 0.2,
@@ -91,4 +90,25 @@ def suggest_three_decks(payload: Dict[str,Any]) -> Dict[str,Any]:
 
     if not resp or not resp.text:
         raise RuntimeError("Empty response from Gemini")
-    return json.loads(resp.text)
+
+    data = json.loads(resp.text)
+
+    # Garantir que sempre existam exatamente 3 decks
+    if "decks" not in data:
+        raise RuntimeError("Malformed response: missing 'decks' field")
+
+    decks = data["decks"]
+    if len(decks) > 3:
+        decks = decks[:3]
+    elif len(decks) < 3:
+        while len(decks) < 3:
+            decks.append({
+                "cards": [],
+                "avg_elixir": 0,
+                "evolved_cards": [],
+                "reasons": "fallback deck (AI returned fewer than 3)",
+                "warnings": ""
+            })
+    data["decks"] = decks
+
+    return data

@@ -124,15 +124,19 @@ def _fallback_from_text(text: str) -> Dict[str, Any]:
 
 
 def _safety_settings_block_none():
-    # Desbloqueia filtros para evitar finish_reason por safety em conteúdo inofensivo.
-    # (Mantemos responsabilidade do lado do usuário).
-    from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    """
+    Retorna configurações compatíveis com todas as versões da lib.
+    Desativa bloqueios automáticos de segurança do Gemini.
+    """
+    # Algumas versões novas da lib renomearam as enums.
+    # Vamos devolver um dicionário simples que a API entende.
     return {
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+        "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+        "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
     }
+
 
 
 # -------- main --------

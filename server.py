@@ -328,5 +328,22 @@ def debug_files():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/test_gemini")
+def test_gemini():
+    import google.generativeai as genai
+    import os
+
+    key = os.getenv("GEMINI_API_KEY")
+    if not key:
+        return "❌ ERRO: GEMINI_API_KEY não está configurada no ambiente do Render.", 500
+
+    try:
+        genai.configure(api_key=key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        resp = model.generate_content("diga 'test ok' se a chave estiver válida")
+        return f"✅ GEMINI RESPONSE: {resp.text}"
+    except Exception as e:
+        return f"❌ ERRO: {e}", 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
